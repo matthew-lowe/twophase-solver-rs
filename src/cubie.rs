@@ -1,7 +1,7 @@
 use strum::IntoEnumIterator;
 use std::fmt::Display;
 use std::ops::Mul;
-use crate::{common::{Corner, Edge, Color, CORNER_FACELET, CORNER_COLOR}, face::FaceCube};
+use crate::{common::{Corner, Edge, Color, CORNER_FACELET, CORNER_COLOR, EDGE_COLOR, EDGE_FACELET}, face::FaceCube};
 
 // Type aliases 
 type CPerm = [Corner; 8]; // corner permuations
@@ -48,9 +48,19 @@ const EO_B: EOrie = [0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1];
 const CP_S: CPerm = [Co::UFR, Co::UFL, Co::UBL, Co::UBR, Co::DFR, Co::DFL, Co::DBL, Co::DBR];
 const EP_S: EPerm = [Ed::UR, Ed::UF, Ed::UL, Ed::UB, Ed::DR, Ed::DF, Ed::DL, Ed::DB, Ed::FR, Ed::FL, Ed::BL, Ed::BR];
 
+// Basic move cubes, solved cubes with each of the basic moves applied
+pub const BASIC_MOVES: [CubieCube; 6] = [
+    CubieCube {cp: CP_U, co: CO_U, ep: EP_U, eo: EO_U},
+    CubieCube {cp: CP_R, co: CO_R, ep: EP_R, eo: EO_R},
+    CubieCube {cp: CP_F, co: CO_F, ep: EP_F, eo: EO_F},
+    CubieCube {cp: CP_D, co: CO_D, ep: EP_D, eo: EO_D},
+    CubieCube {cp: CP_L, co: CO_L, ep: EP_L, eo: EO_L},
+    CubieCube {cp: CP_B, co: CO_B, ep: EP_B, eo: EO_B},
+];
+
 // Cube defined in terms of cubie permutations and orientations
 #[derive(PartialEq, Clone)]
-struct CubieCube {
+pub struct CubieCube {
     cp: CPerm,
     co: COrie,
     ep: EPerm,
@@ -58,7 +68,7 @@ struct CubieCube {
 }
 
 impl CubieCube {
-    fn new(cp: Option<CPerm>, co: Option<COrie>, ep: Option<EPerm>, eo: Option<EOrie>) -> Self {
+    pub fn new(cp: Option<CPerm>, co: Option<COrie>, ep: Option<EPerm>, eo: Option<EOrie>) -> Self {
         CubieCube {
             cp: cp.unwrap_or(CP_S),
             co: co.unwrap_or([0; 8]),
@@ -68,8 +78,8 @@ impl CubieCube {
     }
 
     // Converts to a new FaceCube object
-    fn to_new_facelet(&self) -> FaceCube {
-        let mut faces = [Color::U; 54];
+    pub fn to_new_facelet(&self) -> FaceCube {
+        let mut faces = FaceCube::solved_colors();
         
         // Corners
         for i in 0..8 { // For each corner on the cube
@@ -89,7 +99,7 @@ impl CubieCube {
             for k in 0..2 { // For each face on the edge
                 // LHS: 1st index is the edge (i), 2nd is face ((k+o)%2)
                 // RHS: 1st index is the cubie at the edge, 2nd index is the face of the cubie
-                faces[CORNER_FACELET[i][(k+o) as usize % 2] as usize] = CORNER_COLOR[p as usize][k as usize];
+                faces[EDGE_FACELET[i][(k+o) as usize % 2] as usize] = EDGE_COLOR[p as usize][k as usize];
             }
         }
 
@@ -101,13 +111,14 @@ impl CubieCube {
     // (A*B)(x).c = A(B(x).c).c
     // (A*B)(x).o = (A(B(x).c).o + B(x).o
     // Multiply self by another CubieCube
-    fn corner_muliply(&mut self, b: &Self) {
-        let mut c_perm = [Corner::UFL; 8]; // Final corner permutations
+    pub fn corner_multiply(&mut self, b: &Self) {
+        let mut c_perm = [Corner::UFR; 8]; // Final corner permutations
         let mut c_orie = [0; 8]; // Final corner orientation
 
         for c in Corner::iter() { // Multiply corner by corner
             let c_i = c as usize;
-            c_perm[c as usize] = self.cp[b.cp[c_i] as usize]; // Set the c_perm as the product of
+
+            c_perm[c_i] = self.cp[b.cp[c_i] as usize]; // Set the c_perm as the product of
                                                               // self's perm and b's perm
             let ori_a = self.co[b.cp[c_i] as usize]; // product of self's and b's orientation
             let ori_b = b.co[c_i]; // self's orientation
@@ -122,12 +133,31 @@ impl CubieCube {
                 (a, b) => if a - b < 0 { a - b + 3 } else { a - b }, // a >= 3 && b >= 3, both mirrored, result is reg (between 0 and 2)
             }
         }; 
+        
+        for c in Corner::iter() {
+            let c_i = c as usize;
+
+            self.cp[c_i] = c_perm[c_i];
+            self.co[c_i] = c_orie[c_i];
+        }
+    }
+
+    pub fn corner_multiply_simple(&mut self, b: &Self) {
+        let mut c_perm = [Corner::UFR; 8];
+        let mut c_orie = [0; 8];
+
+        for c in Corner::iter() {
+            let c_i = c as usize;
+            c_perm[c_i] = self.cp[b.cp[c_i] as usize];
+            c_orie[c_i] = (b.co[c_i] + self.co[b.cp[c_i] as usize]) % 3;
+        }
 
         self.cp = c_perm;
         self.co = c_orie;
     }
 
-    fn edge_multiply(&mut self, b: &Self) {
+    // Edges can't be mirrored so can be multiplied normally
+    pub fn edge_multiply(&mut self, b: &Self) {
         let mut e_perm = [Edge::UF; 12];
         let mut e_orie = [0; 12];
 
@@ -143,24 +173,23 @@ impl CubieCube {
     }
 
     // Corner orientation coord, 0..2186, convert orientation in order to ternary number
-    fn get_twist(&self) -> u32 {
-        let mut total = 0;
-        for i in 0..8 {
-            total *= 3;
-            total += self.co[i] as u32;
+    pub fn get_twist(&self) -> u32 {
+        let mut total: u32 = 0;
+        for i in 0..7 { // Ignore DBR since it can be calculated from others
+            total = 3 * total + self.co[i] as u32;
         }
         total
     }
 
-    fn set_twist(&mut self, twist: u32) {
+    pub fn set_twist(&mut self, mut twist: u32) {
         let mut tp: u32 = 0;
 
-        for i in 8..0 {
+        for i in (0..7).rev() {
             // Have to -1 inside because usize can't be negative and the compiler doesn't
             // understand range is exclusive at the end
-            self.co[i - 1] = (twist % 3) as i8;
-            tp += self.co[i - 1] as u32;
-            tp /= 3;
+            self.co[i as usize] = (twist % 3) as i8;
+            tp += self.co[i as usize] as u32;
+            twist = twist / 3;
         }
 
         self.co[Corner::DBR as usize] = ((3 - tp % 3) % 3) as i8;
@@ -173,7 +202,7 @@ impl Mul for CubieCube {
 
     fn mul(self, rhs: Self) -> Self::Output {
         let c = self.clone();
-        c.clone().corner_muliply(&rhs);
+        c.clone().corner_multiply(&rhs);
         c.clone().edge_multiply(&rhs);
         c
     }
@@ -201,6 +230,8 @@ mod tests {
 
     #[test]
     fn nice() {
-        assert_ne!(69, 420);
+        let mut my_thing = CubieCube::new(None, None, None, None);
+        my_thing.set_twist(1494);
+        println!("After again: {}", my_thing.to_new_facelet());
     }
 }

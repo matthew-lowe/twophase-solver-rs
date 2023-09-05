@@ -23,9 +23,12 @@ pub const EDGE_FACELET: [[Facelet; 2]; 12] = [
     [F::D4, F::L8], [F::D8, F::B8], [F::F6, F::R4], [F::F4, F::L6], [F::B6, F::L4], [F::B4, F::R6],
 ];
 
+pub const N_MOVE: usize = 18; // Possible face moves
+pub const N_TWIST: usize = 2187; // Possible corner orientations, 3^7
+
 
 // Enums
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, EnumIter)]
 pub enum Color {
     U = 0,
     R,
