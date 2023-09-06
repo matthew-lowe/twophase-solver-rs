@@ -14,7 +14,7 @@ fn gen_twist_move_table() -> [u16; MT_SIZE] {
     let mut a = CubieCube::new(None, None, None, None);
 
     for i in 0..N_TWIST {
-        a.set_twist(i.clone() as u16);
+        a.set_twist(i as u16);
         //println!("{}", i as u32);
         for j in Color::iter() {
             for k in 0..3 {
@@ -35,7 +35,6 @@ pub fn load_twist_move_table() -> Result<[u16; MT_SIZE], Box<dyn Error>> {
         Ok(mut f) => {
             let mut buffer: Vec::<u8> = Vec::<u8>::new();
             let _ = f.read_to_end(&mut buffer)?; // we know the size duh
-            println!("buffer size: {:?}", buffer.len());
             let bytes: [u8; 2*MT_SIZE] = buffer.try_into().unwrap();
             let mut moves_bytes: [[u8; 2]; MT_SIZE] = [[0; 2]; MT_SIZE];
             
@@ -56,17 +55,17 @@ pub fn load_twist_move_table() -> Result<[u16; MT_SIZE], Box<dyn Error>> {
         },
         Err(_) => {
             let mut f = File::create("twist_moves")?;
-            let moves = gen_twist_move_table(); // [u32; MT_SIZE]
+            let moves = gen_twist_move_table(); // [u16; MT_SIZE]
 
             const BYTE_SIZE: usize = MT_SIZE*2;
-            let bytes: [u8; MT_SIZE*2] = (&moves[..])
+            let bytes: [u8; MT_SIZE*2] = (moves[..])
                 .into_iter()
                 .map(|i| i.to_ne_bytes())
                 .flatten()
                 .collect::<ArrayVec<u8, BYTE_SIZE>>()
                 .into_inner().unwrap();
 
-            f.write_all(&bytes[..])?;
+            f.write_all(&bytes)?;
 
             Ok(moves)
         },
@@ -79,7 +78,6 @@ mod tests {
 
     #[test]
     fn file() {
-        println!("{}", MT_SIZE);
         let _ = load_twist_move_table(); // Ensure the table is created and stored in a file
         assert_eq!(load_twist_move_table().unwrap(), gen_twist_move_table());
     }
