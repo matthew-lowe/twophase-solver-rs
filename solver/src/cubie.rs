@@ -173,10 +173,10 @@ impl CubieCube {
     }
 
     // Corner orientation coord, 0..2186, convert orientation in order to ternary number
-    pub fn get_twist(&self) -> u16 {
-        let mut total: u16 = 0;
+    pub fn get_twist(&self) -> u32 {
+        let mut total: u32 = 0;
         for i in 0..7 { // Ignore DBR since it can be calculated from others
-            total = 3 * total + self.co[i] as u16;
+            total = 3 * total + self.co[i] as u32;
         }
         total
     }
