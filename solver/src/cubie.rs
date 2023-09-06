@@ -1,7 +1,7 @@
 use strum::IntoEnumIterator;
 use std::fmt::Display;
 use std::ops::Mul;
-use crate::{common::{Corner, Edge, Color, CORNER_FACELET, CORNER_COLOR, EDGE_COLOR, EDGE_FACELET}, face::FaceCube};
+use crate::{common::{Corner, Edge, CORNER_FACELET, CORNER_COLOR, EDGE_COLOR, EDGE_FACELET}, face::FaceCube};
 
 // Type aliases 
 type CPerm = [Corner; 8]; // corner permuations
@@ -232,6 +232,5 @@ mod tests {
     fn nice() {
         let mut my_thing = CubieCube::new(None, None, None, None);
         my_thing.set_twist(1494);
-        println!("After again: {}", my_thing.to_new_facelet());
     }
 }
