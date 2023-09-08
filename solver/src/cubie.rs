@@ -142,6 +142,8 @@ impl CubieCube {
         }
     }
 
+    // Multiplies corners normally in C3 without symmetry
+    // Never used but useful when the other function didn't work and i went insane
     pub fn corner_multiply_simple(&mut self, b: &Self) {
         let mut c_perm = [Corner::UFR; 8];
         let mut c_orie = [0; 8];
@@ -173,26 +175,44 @@ impl CubieCube {
     }
 
     // Corner orientation coord, 0..2186, convert orientation in order to ternary number
-    pub fn get_twist(&self) -> u32 {
-        let mut total: u32 = 0;
+    pub fn get_twist(&self) -> u16 {
+        let mut total = 0;
         for i in 0..7 { // Ignore DBR since it can be calculated from others
-            total = 3 * total + self.co[i] as u32;
+            total = 3*total + self.co[i] as u16;
         }
         total
     }
 
     pub fn set_twist(&mut self, mut twist: u16) {
-        let mut tp: u16 = 0;
+        let mut tp = 0;
 
         for i in (0..7).rev() {
-            // Have to -1 inside because usize can't be negative and the compiler doesn't
-            // understand range is exclusive at the end
             self.co[i as usize] = (twist % 3) as i8;
             tp += self.co[i as usize] as u16;
-            twist = twist / 3;
+            twist /= 3;
         }
 
         self.co[Corner::DBR as usize] = ((3 - tp % 3) % 3) as i8;
+    }
+
+    pub fn get_flip(&self) -> u16 {
+        let mut total = 0;
+        for i in 0..11 {
+            total = 2*total + self.eo[i] as u16;
+        }
+        total
+    }
+
+    pub fn set_flip(&mut self, mut flip: u16) {
+        let mut fp = 0;
+
+        for i in (0..11).rev() {
+            self.eo[i] = (flip % 2) as i8;
+            fp += self.eo[i];
+            fp /= 2;
+        }
+
+        self.eo[Edge::BR as usize] = ((2 - fp % 2) % 2) as i8;
     }
 }
 
