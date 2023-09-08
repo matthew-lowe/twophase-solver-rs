@@ -2,3 +2,4 @@ target
 */Cargo.lock
 Cargo.lock
 solver/twist_moves
+solver/flip_moves
