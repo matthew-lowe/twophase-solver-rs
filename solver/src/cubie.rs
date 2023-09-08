@@ -203,7 +203,7 @@ impl CubieCube {
         total
     }
 
-    pub fn set_flip(&mut self, mut flip: u16) {
+    pub fn set_flip(&mut self, flip: u16) {
         let mut fp = 0;
 
         for i in (0..11).rev() {

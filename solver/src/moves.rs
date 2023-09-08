@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::{fs::File, io::Write};
-use std::io::{prelude::*, SeekFrom};
+use std::io::{prelude::*, SeekFrom, Read};
 
 use strum::IntoEnumIterator;
 use bytemuck;
@@ -78,53 +78,39 @@ fn combine_byte_groups<const BUFFER_SIZE: usize, const OUT_SIZE: usize>(buffer: 
             bytes[i][k] = buffer[j + k];
         }
     };
-
+ 
     bytes
 }
 
-/// Load the twist move table, generating it if it doesn't exist
-/// Errors are just returned if generated
-pub fn load_twist_move_table() -> Result<[u16; TWIST_SIZE], Box<dyn Error>> {
-    match File::open("twist_moves") {
+fn load_move_table<const T_SIZE: usize, const T_BYTES_SIZE: usize>(f_name: &str, gen: impl Fn() -> [u16; T_SIZE]) -> Result<[u16; T_SIZE], Box<dyn Error>> {
+    match File::open(f_name) {
         Ok(mut f) => {
-            let mut buffer = [0u8; TWIST_BYTES_SIZE];
+            let mut buffer = [0u8; T_BYTES_SIZE];
 
-            read_by_byte::<TWIST_BYTES_SIZE>(&mut f, &mut buffer);
-            let bytes: [[u8; 2]; TWIST_SIZE] = combine_byte_groups(buffer);
-            let new_bytes: &[u16; TWIST_SIZE] = bytemuck::cast_ref(&bytes);
-            Ok(*new_bytes)
-
-        },
-        Err(_) => {
-            let mut f = File::create("twist_moves")?;
-            let moves = gen_twist_move_table(); // [u16; MT_SIZE]
-            let bytes: &[u8; TWIST_BYTES_SIZE] = bytemuck::cast_ref(&moves);
-            f.write_all(bytes)?;
-
-            Ok(moves)
-        },
-    }
-}
-
-pub fn load_flip_move_table() -> Result<[u16; FLIP_SIZE], Box<dyn Error>> {
-    match File::open("flip_moves") {
-        Ok(mut f) => {
-            let mut buffer = [0u8; FLIP_BYTES_SIZE];
-
-            read_by_byte::<FLIP_BYTES_SIZE>(&mut f, &mut buffer);
-            let bytes: [[u8; 2]; FLIP_SIZE] = combine_byte_groups(buffer);
-            let new_bytes: &[u16; FLIP_SIZE] = bytemuck::cast_ref(&bytes);
+            read_by_byte::<T_BYTES_SIZE>(&mut f, &mut buffer);
+            let bytes: [[u8; 2]; T_SIZE] = combine_byte_groups(buffer);
+            let new_bytes: &[u16; T_SIZE] = bytemuck::cast_ref(&bytes);
             Ok(*new_bytes)
         },
         Err(_) => {
-            let mut f = File::create("flip_moves")?;
-            let moves = gen_flip_move_table(); // [u16; MT_SIZE]
-            let bytes: &[u8; FLIP_BYTES_SIZE] = bytemuck::cast_ref(&moves);
+            let mut f = File::create(f_name)?;
+            let moves = gen();
+            let bytes: &[u8; T_BYTES_SIZE] = bytemuck::cast_ref(&moves);
             f.write_all(bytes)?;
 
             Ok(moves)
         }
     }
+}
+
+/// Load the twist move table, generating it if it doesn't exist
+/// Errors are just returned if generated
+pub fn load_twist_move_table() -> Result<[u16; TWIST_SIZE], Box<dyn Error>> {
+    load_move_table::<TWIST_SIZE, TWIST_BYTES_SIZE>("twist_moves", gen_twist_move_table)
+}
+
+pub fn load_flip_move_table() -> Result<[u16; FLIP_SIZE], Box<dyn Error>> {
+    load_move_table::<FLIP_SIZE, FLIP_BYTES_SIZE>("flip_moves", gen_flip_move_table)
 }
 
 #[cfg(test)]
