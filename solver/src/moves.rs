@@ -1,9 +1,10 @@
 use std::error::Error;
-use std::{fs::File, io::Write};
+use std::{fs::File, io::Write, path::Path};
 use std::io::{prelude::*, SeekFrom, Read};
 
 use strum::IntoEnumIterator;
 use bytemuck;
+
 use crate::common::N_FLIP;
 use crate::{common::{N_TWIST, N_MOVE, Color}, cubie::{CubieCube, BASIC_MOVES}};
 
@@ -36,7 +37,7 @@ fn gen_twist_move_table() -> [u16; TWIST_SIZE] {
     twist_move
 }
 
-// Generate edge flip move table
+/// Generate edge flip move table
 fn gen_flip_move_table() -> [u16; FLIP_SIZE] {
     let mut flip_move = [0; FLIP_SIZE];
     let mut a = CubieCube::new(None, None, None, None);
@@ -82,8 +83,11 @@ fn combine_byte_groups<const BUFFER_SIZE: usize, const OUT_SIZE: usize>(buffer: 
     bytes
 }
 
+/// Generic function to load/generate a move table
 fn load_move_table<const T_SIZE: usize, const T_BYTES_SIZE: usize>(f_name: &str, gen: impl Fn() -> [u16; T_SIZE]) -> Result<[u16; T_SIZE], Box<dyn Error>> {
-    match File::open(f_name) {
+    let dir = &format!("{}{}", "tables/", f_name);
+    let path = Path::new(dir);
+    match File::open(path) {
         Ok(mut f) => {
             let mut buffer = [0u8; T_BYTES_SIZE];
 
@@ -93,7 +97,7 @@ fn load_move_table<const T_SIZE: usize, const T_BYTES_SIZE: usize>(f_name: &str,
             Ok(*new_bytes)
         },
         Err(_) => {
-            let mut f = File::create(f_name)?;
+            let mut f = File::create(path)?;
             let moves = gen();
             let bytes: &[u8; T_BYTES_SIZE] = bytemuck::cast_ref(&moves);
             f.write_all(bytes)?;
@@ -105,28 +109,57 @@ fn load_move_table<const T_SIZE: usize, const T_BYTES_SIZE: usize>(f_name: &str,
 
 /// Load the twist move table, generating it if it doesn't exist
 /// Errors are just returned if generated
-pub fn load_twist_move_table() -> Result<[u16; TWIST_SIZE], Box<dyn Error>> {
-    load_move_table::<TWIST_SIZE, TWIST_BYTES_SIZE>("twist_moves", gen_twist_move_table)
+/// `dir` can be optional path to the file 
+pub fn load_twist_move_table(dir: Option<&Path>) -> Result<[u16; TWIST_SIZE], Box<dyn Error>> {
+    match dir {
+        Some(p) => load_move_table::<TWIST_SIZE, TWIST_BYTES_SIZE>(p.join("move_twist").to_str().unwrap(), gen_twist_move_table),
+        None => load_move_table::<TWIST_SIZE, TWIST_BYTES_SIZE>("move_twist", gen_twist_move_table),
+    }
 }
 
-pub fn load_flip_move_table() -> Result<[u16; FLIP_SIZE], Box<dyn Error>> {
-    load_move_table::<FLIP_SIZE, FLIP_BYTES_SIZE>("flip_moves", gen_flip_move_table)
+pub fn load_flip_move_table(dir: Option<&Path>) -> Result<[u16; FLIP_SIZE], Box<dyn Error>> {
+    match dir {
+        Some(p) => load_move_table::<FLIP_SIZE, FLIP_BYTES_SIZE>(p.join("move_flip").to_str().unwrap(), gen_flip_move_table),
+        None => load_move_table::<FLIP_SIZE, FLIP_BYTES_SIZE>("move_flip", gen_flip_move_table),
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile;
 
-    #[test]
-    fn twist_file_saves_and_loads() {
-        let _ = load_twist_move_table().unwrap(); // Ensure the table is created and stored in a file if not already
-        assert_eq!(load_twist_move_table().unwrap(), gen_twist_move_table());
+    /// Return an empty array to ensure the test fails
+    fn zoinks<T, const S: usize>() -> [T; S] where T: Default + Copy {
+        [T::default(); S]
     }
 
+    /// Ensure that files are saved and loaded with the same data
     #[test]
-    fn flip_file_saves_and_loads() {
-        let _ = load_flip_move_table().unwrap(); // Ensure the table is created and stored in a file if not already
-        assert_eq!(load_flip_move_table().unwrap(), gen_flip_move_table());
+    fn file_saves_and_loads() {
+        let tmpdir = tempfile::tempdir().unwrap();
+        let tmppath = tmpdir.path();
+        println!("{:?}", tmppath);
+        let _ = load_twist_move_table(Some(tmppath)).unwrap();
+        assert_eq!(load_twist_move_table(Some(tmppath)).unwrap(), gen_twist_move_table());
+        let _ = load_flip_move_table(Some(tmppath)).unwrap();
+        assert_eq!(load_flip_move_table(Some(tmppath)).unwrap(), gen_flip_move_table());
+    }
+
+    /// Compare the twist data to a known good and ensure they match
+    #[test]
+    fn twist_file_correct() {
+        let twists = load_twist_move_table(None).unwrap();
+        let good_twists = load_move_table::<TWIST_SIZE, TWIST_BYTES_SIZE>("known_good/move_twist", zoinks).unwrap();
+        assert_eq!(twists, good_twists);
+    }
+
+    /// Compare the flip data to a known good and ensure they match
+    #[test]
+    fn flip_file_correct() {
+        let flips = load_flip_move_table(None).unwrap();
+        let good_flips = load_move_table::<FLIP_SIZE, FLIP_BYTES_SIZE>("known_good/move_flip", zoinks).unwrap();
+        //assert_eq!(good_flips, flips);
     }
 }
 

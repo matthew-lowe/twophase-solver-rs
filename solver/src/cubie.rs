@@ -2,8 +2,8 @@ use strum::IntoEnumIterator;
 use std::fmt::Display;
 use std::ops::Mul;
 use crate::{
-    common::{Corner, Edge, CORNER_FACELET, CORNER_COLOR, EDGE_COLOR, EDGE_FACELET},
-    face::FaceCube, misc::{c_nk, rotate_left}
+    common::{Corner, Edge},
+    misc::{c_nk, rotate_left}
 };
 
 // Type aliases 
@@ -64,10 +64,10 @@ pub const BASIC_MOVES: [CubieCube; 6] = [
 // Cube defined in terms of cubie permutations and orientations
 #[derive(PartialEq, Clone)]
 pub struct CubieCube {
-    cp: CPerm,
-    co: COrie,
-    ep: EPerm,
-    eo: EOrie,
+    pub(crate) cp: CPerm,
+    pub(crate) co: COrie,
+    pub(crate) ep: EPerm,
+    pub(crate) eo: EOrie,
 }
 
 impl CubieCube {
@@ -78,37 +78,6 @@ impl CubieCube {
             ep: ep.unwrap_or(EP_S),
             eo: eo.unwrap_or([0; 12]),
         }
-    }
-
-    // Converts to a new FaceCube object
-    pub fn to_new_facelet(&self) -> FaceCube {
-        let mut faces = FaceCube::solved_colors();
-        
-        // Corners
-        for i in 0..8 { // For each corner on the cube
-            let p = self.cp[i] as u8; // The cubie that is at that corner
-            let o = self.co[i]; // Orientation index, 0 = matches cubie ref, 1 = CW, 2 = CCW
-
-            for k in 0..3 { // For each face on the corner going CW
-                // LHS: 1st index is the corner (i), 2nd is face going CW from ref ((k+o)%3)
-                // RHS: 1st index is the cubie at the corner, 2nd index is the face of the cubie
-                faces[CORNER_FACELET[i][(k+o) as usize % 3] as usize] = CORNER_COLOR[p as usize][k as usize];
-            }
-        }
-        for i in 0..12 { // For each edge
-            let p = self.ep[i] as i8; // Permutation index
-            let o = self.eo[i]; // Orientation index, 0 = matches cubie ref, 1 = doesn't match
-
-            for k in 0..2 { // For each face on the edge
-                // LHS: 1st index is the edge (i), 2nd is face ((k+o)%2)
-                // RHS: 1st index is the cubie at the edge, 2nd index is the face of the cubie
-                faces[EDGE_FACELET[i][(k+o) as usize % 2] as usize] = EDGE_COLOR[p as usize][k as usize];
-            }
-        }
-
-        // Edges
-
-        FaceCube { faces }
     }
 
     // (A*B)(x).c = A(B(x).c).c
@@ -207,13 +176,13 @@ impl CubieCube {
         total
     }
 
-    pub fn set_flip(&mut self, flip: u16) {
+    pub fn set_flip(&mut self, mut flip: u16) {
         let mut fp = 0;
 
         for i in (0..11).rev() {
             self.eo[i] = (flip % 2) as i8;
             fp += self.eo[i];
-            fp /= 2;
+            flip /= 2;
         }
 
         self.eo[Edge::BR as usize] = ((2 - fp % 2) % 2) as i8;
@@ -224,15 +193,19 @@ impl CubieCube {
         let mut a = 0;
         let mut x = 0;
 
-        for j in ((Edge::UR as usize)..(Edge::BR as usize + 1)).rev() {
-            if Edge::FR as u16 <= self.ep[j] as u16 // If the edge is in the UD slice
-            && self.ep[j] as u16 <= Edge::BR as u16 {
-                a += c_nk(11 - j as u16, x + 1);
+        for j in Edge::iter().rev() { // For each edge on the cube
+            if Edge::FR as u16 <= self.ep[j as usize] as u16 // If the edge is in the UD slice
+            && self.ep[j as usize] as u16 <= Edge::BR as u16 {
+                // number of ways to choose 4
+                a += c_nk(11 - j as u16, x + 1); // a < 14C4
                 x += 1
             }
         };
 
         a
+    }
+
+    pub fn set_slice(&mut self, idx: u16) { 
     }
 
     /// UD Slice, 0..11880 phase 1, 0..24 phase 2
@@ -304,8 +277,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nice() {
-        let mut my_thing = CubieCube::new(None, None, None, None);
-        my_thing.set_twist(1494);
+    fn get_set_flip() {
+        let test_twists = [0, 1, 2, 69, 420, 523, 1547, 2047];
+        for test_twist in test_twists {
+            let mut cube = CubieCube::new(None, None, None, None);
+            cube.set_flip(test_twist);
+            assert_eq!(cube.get_flip(), test_twist);
+        }
     }
 }

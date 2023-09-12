@@ -26,6 +26,7 @@ pub const EDGE_FACELET: [[Facelet; 2]; 12] = [
 pub const N_MOVE: usize = 18; // Possible face moves
 pub const N_TWIST: usize = 2187; // Possible corner orientations, 3^7 (ignore 1 corner)
 pub const N_FLIP: usize = 2048; // Possible edge flips, 2^11 (ignore 1 edge)
+pub const N_SLICE_SORTED: usize = 11880; // Possible variations of the UD slice
 
 
 // Enums
