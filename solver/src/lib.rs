@@ -2,6 +2,7 @@ pub mod common;
 pub mod face;
 pub mod cubie;
 pub mod moves;
+pub mod misc;
 
 pub fn add(left: usize, right: usize) -> usize {
     left + right

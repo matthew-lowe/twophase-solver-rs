@@ -88,8 +88,8 @@ fn load_move_table<const T_SIZE: usize, const T_BYTES_SIZE: usize>(f_name: &str,
             let mut buffer = [0u8; T_BYTES_SIZE];
 
             read_by_byte::<T_BYTES_SIZE>(&mut f, &mut buffer);
-            let bytes: [[u8; 2]; T_SIZE] = combine_byte_groups(buffer);
-            let new_bytes: &[u16; T_SIZE] = bytemuck::cast_ref(&bytes);
+            let grouped_bytes: [[u8; 2]; T_SIZE] = combine_byte_groups(buffer);
+            let new_bytes: &[u16; T_SIZE] = bytemuck::cast_ref(&grouped_bytes);
             Ok(*new_bytes)
         },
         Err(_) => {
@@ -127,7 +127,6 @@ mod tests {
     fn flip_file_saves_and_loads() {
         let _ = load_flip_move_table().unwrap(); // Ensure the table is created and stored in a file if not already
         assert_eq!(load_flip_move_table().unwrap(), gen_flip_move_table());
-
     }
 }
 

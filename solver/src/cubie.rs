@@ -1,7 +1,10 @@
 use strum::IntoEnumIterator;
 use std::fmt::Display;
 use std::ops::Mul;
-use crate::{common::{Corner, Edge, CORNER_FACELET, CORNER_COLOR, EDGE_COLOR, EDGE_FACELET}, face::FaceCube};
+use crate::{
+    common::{Corner, Edge, CORNER_FACELET, CORNER_COLOR, EDGE_COLOR, EDGE_FACELET},
+    face::FaceCube, misc::{c_nk, rotate_left}
+};
 
 // Type aliases 
 type CPerm = [Corner; 8]; // corner permuations
@@ -184,17 +187,18 @@ impl CubieCube {
     }
 
     pub fn set_twist(&mut self, mut twist: u16) {
-        let mut tp = 0;
+        let mut tp = 0; // used to calculate last edge after the rest have been set
 
         for i in (0..7).rev() {
-            self.co[i as usize] = (twist % 3) as i8;
-            tp += self.co[i as usize] as u16;
+            self.co[i as usize] = (twist % 3) as i8; // LSD of twist
+            tp += self.co[i as usize] as u16; // collect the sum of all edges
             twist /= 3;
         }
 
         self.co[Corner::DBR as usize] = ((3 - tp % 3) % 3) as i8;
     }
 
+    // Edge orientation, 0..2048
     pub fn get_flip(&self) -> u16 {
         let mut total = 0;
         for i in 0..11 {
@@ -214,6 +218,57 @@ impl CubieCube {
 
         self.eo[Edge::BR as usize] = ((2 - fp % 2) % 2) as i8;
     }
+
+    /// UD Slice orientation, 0..495 phase 1, 0 phase 2
+    pub fn get_slice(&self) -> u16 {
+        let mut a = 0;
+        let mut x = 0;
+
+        for j in ((Edge::UR as usize)..(Edge::BR as usize + 1)).rev() {
+            if Edge::FR as u16 <= self.ep[j] as u16 // If the edge is in the UD slice
+            && self.ep[j] as u16 <= Edge::BR as u16 {
+                a += c_nk(11 - j as u16, x + 1);
+                x += 1
+            }
+        };
+
+        a
+    }
+
+    /// UD Slice, 0..11880 phase 1, 0..24 phase 2
+    pub fn get_slice_sorted(&self) -> u16 {
+        let mut a = 0;
+        let mut x = 0;
+        let mut edge_4 = [0; 4];
+        
+
+        for j in ((Edge::UR as usize)..(Edge::BR as usize + 1)).rev() {
+            if Edge::FR as u16 <= self.ep[j] as u16 // If the edge is in the UD slice
+            && self.ep[j] as u16 <= Edge::BR as u16 {
+                a += c_nk(11 - j as u16, x + 1);
+                edge_4[3 - x as usize] = self.ep[j] as u16;
+                x += 1
+            }
+        };
+
+        let mut b = 0;
+
+        for j in (1..4).rev() {
+            let mut k = 0;
+            while edge_4[k] != j + 8 {
+                rotate_left(&mut edge_4, 0, j as usize);
+                k += 1;
+            }
+            b = (j + 1)*b + k as u16;
+        };
+
+        24*a + b
+    }
+
+    /// Permutation of U edges (UR, UF, UL and UB)
+    pub fn get_u_edges(&self) -> u16 {
+        9
+    }
 }
 
 // Multiply is the group operation
@@ -230,13 +285,13 @@ impl Mul for CubieCube {
 
 impl Display for CubieCube {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for i in 0..8 {
+        for i in 0..Corner::iter().len() {
             f.write_str(format!("({:?}, {:?})", self.cp[i], self. co[i]).as_str()).unwrap();
         };
 
         f.write_str("\n").unwrap();
 
-        for i in 0..12 {
+        for i in 0..Edge::iter().len() {
             f.write_str(format!("({:?}, {:?})", self.ep[i], self. eo[i]).as_str()).unwrap();
         };
 
