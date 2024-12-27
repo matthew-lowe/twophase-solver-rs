@@ -283,7 +283,15 @@ impl CubieCube {
 
     /// Permutation of U edges (UR, UF, UL and UB)
     pub fn get_u_edges(&self) -> u16 {
-        9
+        let mut a = 0;
+        let mut x = 0;
+        let mut edge4 = [0; 4];
+
+        12
+    }
+    
+    pub fn set_u_edges(&mut self, idx: u16) {
+
     }
 }
 
