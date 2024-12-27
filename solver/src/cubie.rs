@@ -1,9 +1,9 @@
 use strum::IntoEnumIterator;
-use std::fmt::Display;
+use std::{fmt::Display};
 use std::ops::Mul;
 use crate::{
     common::{Corner, Edge},
-    misc::{c_nk, rotate_left}
+    misc::{c_nk, rotate_left, rotate_right}
 };
 
 // Type aliases 
@@ -135,7 +135,7 @@ impl CubieCube {
         let mut e_perm = [Edge::UF; 12];
         let mut e_orie = [0; 12];
 
-        for e in Edge::iter() {
+        for e in Edge::iter().skip(1) {
             let e_i = e as usize;
             e_perm[e_i] = self.ep[b.ep[e_i] as usize];
             e_orie[e_i] = (b.eo[e_i] + self.eo[b.ep[e_i] as usize]) % 2;
@@ -193,7 +193,7 @@ impl CubieCube {
         let mut a = 0;
         let mut x = 0;
 
-        for j in Edge::iter().rev() { // For each edge on the cube
+        for j in Edge::iter().skip(1).rev() { // For each edge on the cube
             if Edge::FR as u16 <= self.ep[j as usize] as u16 // If the edge is in the UD slice
             && self.ep[j as usize] as u16 <= Edge::BR as u16 {
                 // number of ways to choose 4
@@ -215,7 +215,8 @@ impl CubieCube {
         let mut edge_4 = [0; 4];
         
 
-        for j in ((Edge::UR as usize)..(Edge::BR as usize + 1)).rev() {
+        //for j in ((Edge::UR as usize)..(Edge::BR as usize + 1)).rev() {
+        for j in (0..Edge::iter().skip(1).len()).rev() {
             if Edge::FR as u16 <= self.ep[j] as u16 // If the edge is in the UD slice
             && self.ep[j] as u16 <= Edge::BR as u16 {
                 a += c_nk(11 - j as u16, x + 1);
@@ -227,8 +228,9 @@ impl CubieCube {
         let mut b = 0;
 
         for j in (1..4).rev() {
+        //for j in 3..0 {
             let mut k = 0;
-            while edge_4[k] != j + 8 {
+            while edge_4[j as usize] != j + 8 {
                 rotate_left(&mut edge_4, 0, j as usize);
                 k += 1;
             }
@@ -236,6 +238,47 @@ impl CubieCube {
         };
 
         24*a + b
+    }
+
+    /// Set UD slice, 0.11880 P1, 0..24 P2
+    pub fn set_slice_sorted(&mut self, idx: u16) {
+        let mut slice_edge = [Ed::FR, Ed::FL, Ed::BL, Ed::BR];
+        let other_edge = [Ed::UR, Ed::UF, Ed::UL, Ed::UB, Ed::DR, Ed::DF, Ed::DL, Ed::DB];
+        let mut b = idx as u32 % 24;
+        let mut a = idx as u32 / 24;
+
+        for e in Ed::iter().skip(1) {
+            self.ep[e as usize] = Ed::INV;
+        }
+        
+        let mut j = 1;
+        while j < 4 {
+            let mut k = b % (j + 1);
+            b /= j + 1;
+            while k > 0 {
+                rotate_right(&mut slice_edge, 0, j as usize);
+                k -= 1
+            }
+            j += 1
+        }
+
+        let mut x = 4;
+        for j in Ed::iter().skip(1) {
+            if a as i32 - c_nk(11 - j as u16, x) as i32 >= 0 {
+                self.ep[j as usize] = slice_edge[4 - x as usize];
+                a -= c_nk(11 - j as u16, x) as u32;
+                x -= 1;
+            }
+        }
+
+        let mut x = 0;
+        for j in Ed::iter().skip(1) {
+            if self.ep[j as usize] == Ed::INV {
+                self.ep[j as usize] = other_edge[x];
+                x += 1;
+            }
+        }
+
     }
 
     /// Permutation of U edges (UR, UF, UL and UB)
@@ -264,7 +307,7 @@ impl Display for CubieCube {
 
         f.write_str("\n").unwrap();
 
-        for i in 0..Edge::iter().len() {
+        for i in 0..Edge::iter().skip(1).len() {
             f.write_str(format!("({:?}, {:?})", self.ep[i], self. eo[i]).as_str()).unwrap();
         };
 
@@ -274,6 +317,8 @@ impl Display for CubieCube {
 
 #[cfg(test)]
 mod tests {
+    use core::num;
+
     use super::*;
 
     #[test]
@@ -284,5 +329,26 @@ mod tests {
             cube.set_flip(test_twist);
             assert_eq!(cube.get_flip(), test_twist);
         }
+    }
+
+    #[test]
+    fn get_set_slice_sorted() {
+        let test_slice_sorted = [0, 1, 2, 69, 420, 523, 1547, 2047];
+        for case in test_slice_sorted {
+            let mut cube = CubieCube::new(None, None, None, None);
+            cube.set_slice_sorted(case);
+            //assert_eq!(cube.get_slice_sorted(), case);
+            println!("set: {}, get: {}", case, cube.get_slice_sorted());
+        }
+
+        let set = 420;
+        let mut cube = CubieCube::new(None,None,None,None);
+        cube.set_slice_sorted(set);
+        let ep = cube.ep;
+        println!("Set: {}, ep: {:?}", set, ep);
+
+        //let mut numbers = [1,2,3,4,5,6,7,8,9];
+        //rotate_right(&mut numbers, 0, 4);
+        //println!("numbers: {:?}", numbers);
     }
 }

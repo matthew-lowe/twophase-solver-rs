@@ -55,6 +55,7 @@ pub enum Corner {
 
 #[derive(Debug, Clone, Copy, PartialEq, EnumIter)]
 pub enum Edge {
+    INV = -1,
     UR = 0,
     UF,
     UL,
